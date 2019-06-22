@@ -65,9 +65,10 @@ class Agent(nn.Module):
         state = self.env.reset()
         for t in range(max_t):
             state = torch.from_numpy(state).float().to(device)
-            action = (round(((max(self.forward(state)))).item()))
-            #action=[torch.from_numpy(action)]
-            #print("action is ",action)
+            action=self.forward(state)
+            values,indices=torch.max(action,0)
+            action=indices.item()
+
             state, reward, done, _ = self.env.step(action)
             episode_return += reward * math.pow(gamma, t)
             if done:
@@ -75,7 +76,6 @@ class Agent(nn.Module):
         return episode_return
 
 agent = Agent(env).to(device)
-
 
 
 def cem(n_iterations=1000, max_t=500, gamma=1.0, print_every=10, pop_size=50, elite_frac=0.2, sigma=0.5):
