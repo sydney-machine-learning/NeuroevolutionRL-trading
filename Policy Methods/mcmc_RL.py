@@ -86,7 +86,20 @@ agent = Agent(env).to(device)
 
 
 
+def prior_likelihood(sigma_squared, nu_1, nu_2, w, tausq,h,d):
+    h = h  # number hidden neurons
+    d = d  # number input neurons
+    part1 = -1 * ((d * h + h + 2) / 2) * np.log(sigma_squared)
+    part2 = 1 / (2 * sigma_squared) * (sum(np.square(w)))
+    log_loss = part1 - part2 - (1 + nu_1) * np.log(tausq) - (nu_2 / tausq)
+    return log_loss
 
+def likelihood_func(sigma,gamma, max_t,w, tausq,n_iterations,norm_rew):
+        #y = data[:, self.topology[0]]
+        
+        rmse = norm_rew.mean()
+        loss = -0.5 * np.log(2 * math.pi * tausq) - 0.5 * np.square(norm_rew) / tausq
+        return [np.sum(loss), rmse]
 
 
 
