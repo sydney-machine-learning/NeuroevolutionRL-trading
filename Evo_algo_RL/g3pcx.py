@@ -17,7 +17,7 @@ import torch.nn.functional as F
 from sklearn import datasets
 
 class Evolution(object):
-	def __init__(self, pop_size, dimen, max_evals,  max_limits, min_limits,data,output):
+	def __init__(self, pop_size,  max_evals,data,output):
 		self.EPSILON = 1e-40  # convergence
 		self.sigma_eta = 0.1
 		self.sigma_zeta = 0.1
@@ -25,8 +25,6 @@ class Evolution(object):
 		self.num_parents = 3
 		self.family = 2
 		self.sp_size = self.children + self.family
-		self.population =   np.random.randn( pop_size  , dimen)  * 5  #[SpeciesPopulation(dimen) for count in xrange(pop_size)]
-		self.sub_pop =  np.random.randn( self.sp_size , dimen )  * 5  #[SpeciesPopulation(dimen) for count in xrange(NPSize)]
 		self.fitness = np.random.randn( pop_size)
 		self.sp_fit  = np.random.randn(self.sp_size)
 		self.best_index = 0
@@ -39,21 +37,56 @@ class Evolution(object):
 		self.list = np.arange(0, self.sp_size)
 		self.parents = np.arange(0, pop_size)
 		self.pop_size = pop_size
-		self.dimen = dimen
+
 		self.num_evals = 0
 		self.max_evals = max_evals
 		self.problem = 1
 		self.data=data
 		self.output=output
-		self.input_size = dimen
+		# self.input_size = dimen
 		self.hidden_sizes = 2
-		self.output_size = 1
+		self.output_size = 3
+		# super(Agent, self).__init__()
+        # self.env = env
+        # state, hidden layer, action sizes
+		self.s_size = 2
 
+		self.h_size = 16
+		self.a_size = 3
+		self.dimen = (self.s_size+1)*self.h_size + (self.h_size+1)*self.a_size
+		self.population =   np.random.randn( pop_size  , self.dimen)  * 5  #[SpeciesPopulation(dimen) for count in xrange(pop_size)]
+		self.sub_pop =  np.random.randn( self.sp_size , self.dimen )  * 5  #[SpeciesPopulation(dimen) for count in xrange(NPSize)]
+        # define layers
+		self.fc1 = nn.Linear(self.s_size, self.h_size)
+		self.fc2 = nn.Linear(self.h_size, self.a_size)
+	
+	
+	
+	
+	def set_weights(self, weights):
+		s_size = self.s_size
+		h_size = self.h_size
+		a_size = self.a_size
+        # separate the weights for each layer
+		fc1_end = (s_size*h_size)+h_size
+		fc1_W = torch.from_numpy(weights[:s_size*h_size].reshape(s_size, h_size))
+		fc1_b = torch.from_numpy(weights[s_size*h_size:fc1_end])
+		fc2_W = torch.from_numpy(weights[fc1_end:fc1_end+(h_size*a_size)].reshape(h_size, a_size))
+		fc2_b = torch.from_numpy(weights[fc1_end+(h_size*a_size):])
+        # set the weights for each layer
+		self.fc1.weight.data.copy_(fc1_W.view_as(self.fc1.weight.data))
+		self.fc1.bias.data.copy_(fc1_b.view_as(self.fc1.bias.data))
+		self.fc2.weight.data.copy_(fc2_W.view_as(self.fc2.weight.data))
+		self.fc2.bias.data.copy_(fc2_b.view_as(self.fc2.bias.data))
 
-	def model_generator(self):
-		# Build a feed-forward network
-		model = nn.Sequential(OrderedDict([('fc1', nn.Linear(self.input_size, self.output_size))]))
-		return model
+	def forward(self, x):
+		x = F.relu(self.fc1(x))
+		x = F.sigmoid(self.fc2(x))
+		x=F.softmax(x,dim=0)
+		return x.cpu().data
+	
+	def get_weights_dim(self):
+		return (self.s_size+1)*self.h_size + (self.h_size+1)*self.a_size
 
 	def fit_func(self, x):    #  function  (can be any other function, model or even a neural network)
 		fit = 0.0
@@ -65,10 +98,29 @@ class Evolution(object):
 		# 		fit = fit + ((j+1)*(x[j]*x[j]))
 
 
-		model=self.model_generator()
+		# print("weights shape",x.shape)
+		self.set_weights(x)
 
-		output= model.forward(self.data)
-		fit=np.sum(output.detach().numpy())
+		# out= model.forward((self.data).float())
+		out=self.forward((self.data).float())
+		
+		criterion = nn.CrossEntropyLoss()
+
+		Y= np.zeros(out.shape)
+		# print("lllllllllllllll",out.shape[0])
+
+		Y[np.arange(out.shape[0]), (self.output)] = 1
+		# print(Y)
+		Y=torch.from_numpy(Y)
+		print(out.shape,Y.shape)
+		# criterion=nn.MSELoss()
+
+		# criterion = nn.MSELoss()
+		criterion = nn.MSELoss()
+		loss = torch.sqrt(criterion(out,Y))
+		# loss = 
+		# print(loss)
+		fit = loss
 
 		
 
@@ -286,20 +338,19 @@ def main():
 	
 	X = iris.data[:, :2]  # we only take the first two features.
 	y = iris.target
-	X= torch.randn(10,2, requires_grad=False)
-	data=X
-	output=y
+	# X= torch.randn(10,2, requires_grad=False)
+	data=torch.from_numpy(X)
+	output=torch.from_numpy(y)	
 	print("X shape",data.shape)
 
 
 	MinCriteria = 0.005  # stop when RMSE reaches MinCriteria ( problem dependent)
 	random.seed(time.time())
-	max_evals = 700000
+	max_evals = 1
 	pop_size =  100
-	num_varibles = 2
-	max_limits = np.repeat(5, num_varibles)
-	min_limits = np.repeat(-5, num_varibles)
-	g3pcx  = Evolution(pop_size, num_varibles, max_evals,  max_limits, min_limits,data,output)
+	# max_limits = np.repeat(5, num_varibles)
+	# min_limits = np.repeat(-5, num_varibles)
+	g3pcx  = Evolution(pop_size,  max_evals,data,output)
 	g3pcx.evolve()
 
 
