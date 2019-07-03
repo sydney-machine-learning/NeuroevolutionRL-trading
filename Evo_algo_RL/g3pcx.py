@@ -49,10 +49,10 @@ class Evolution(object):
 		# super(Agent, self).__init__()
         # self.env = env
         # state, hidden layer, action sizes
-		self.s_size = 2
+		self.s_size = 4
 
 		self.h_size = 16
-		self.a_size = 3
+		self.a_size = 1
 		self.dimen = (self.s_size+1)*self.h_size + (self.h_size+1)*self.a_size
 		self.population =   np.random.randn( pop_size  , self.dimen)  * 5  #[SpeciesPopulation(dimen) for count in xrange(pop_size)]
 		self.sub_pop =  np.random.randn( self.sp_size , self.dimen )  * 5  #[SpeciesPopulation(dimen) for count in xrange(NPSize)]
@@ -102,25 +102,17 @@ class Evolution(object):
 		self.set_weights(x)
 
 		# out= model.forward((self.data).float())
-		out=self.forward((self.data).float())
-		
-		criterion = nn.CrossEntropyLoss()
-
-		Y= np.zeros(out.shape)
-		# print("lllllllllllllll",out.shape[0])
-
-		Y[np.arange(out.shape[0]), (self.output)] = 1
+		out=self.forward((self.data).float()).double()
 		# print(Y)
-		Y=torch.from_numpy(Y)
-		print(out.shape,Y.shape)
+		Y=self.output.double()
+		# print(out.shape,Y.shape)
 		# criterion=nn.MSELoss()
+		error=torch.sqrt(torch.sum((Y-out)**2)/Y.shape[0]).item()
 
 		# criterion = nn.MSELoss()
-		criterion = nn.MSELoss()
-		loss = torch.sqrt(criterion(out,Y))
-		# loss = 
+		
 		# print(loss)
-		fit = loss
+		fit = 1/error
 
 		
 
@@ -347,10 +339,11 @@ class Evolution(object):
 
 
 def main():
-	iris = datasets.load_iris()
-	
-	X = iris.data[:, :2]  # we only take the first two features.
-	y = iris.target
+	table=np.loadtxt("sunspots.csv")
+
+
+	X = table[:,:4]  # we only take the first two features.
+	y = table[:,4]
 	# X= torch.randn(10,2, requires_grad=False)
 	data=torch.from_numpy(X)
 	output=torch.from_numpy(y)	
