@@ -59,14 +59,17 @@ class Evolution(object):
         # define layers
 		self.fc1 = nn.Linear(self.s_size, self.h_size)
 		self.fc2 = nn.Linear(self.h_size, self.a_size)
+		self.errorlist=[]
 	
 	
 	
 	
 	def set_weights(self, weights):
+		# print("weights",weights[0:5])
 		s_size = self.s_size
 		h_size = self.h_size
 		a_size = self.a_size
+		#print("11111111111111111111111111111111111111")
         # separate the weights for each layer
 		fc1_end = (s_size*h_size)+h_size
 		fc1_W = torch.from_numpy(weights[:s_size*h_size].reshape(s_size, h_size))
@@ -75,6 +78,7 @@ class Evolution(object):
 		fc2_b = torch.from_numpy(weights[fc1_end+(h_size*a_size):])
         # set the weights for each layer
 		self.fc1.weight.data.copy_(fc1_W.view_as(self.fc1.weight.data))
+		# print(self.fc1.weight.data)
 		self.fc1.bias.data.copy_(fc1_b.view_as(self.fc1.bias.data))
 		self.fc2.weight.data.copy_(fc2_W.view_as(self.fc2.weight.data))
 		self.fc2.bias.data.copy_(fc2_b.view_as(self.fc2.bias.data))
@@ -82,7 +86,8 @@ class Evolution(object):
 	def forward(self, x):
 		x = F.relu(self.fc1(x))
 		x = F.sigmoid(self.fc2(x))
-		x=F.softmax(x,dim=0)
+		print(x.shape)
+		# print(x.cpu().data)
 		return x.cpu().data
 	
 	def get_weights_dim(self):
@@ -96,30 +101,16 @@ class Evolution(object):
 		# elif self.problem ==2:  # ellipsoidal - sphere function
 		# 	for j in range(x.size):
 		# 		fit = fit + ((j+1)*(x[j]*x[j]))
-
-
-		# print("weights shape",x.shape)
 		self.set_weights(x)
-
-		# out= model.forward((self.data).float())
 		out=self.forward((self.data).float()).double()
-		# print(Y)
 		Y=self.output.double()
-		# print(out.shape,Y.shape)
-		# criterion=nn.MSELoss()
-		error=torch.sqrt(torch.sum((Y-out)**2)/Y.shape[0]).item()
-
-		# criterion = nn.MSELoss()
-		
-		# print(loss)
+		# # print(out)
+		# error=torch.sqrt(torch.sum((Y-out)**2)/Y.shape[0]).item()
+		# if self.num_evals%200 ==0:
+		# 	(self.errorlist).append(error)
+		criterion = nn.MSELoss()
+		error = torch.sqrt(criterion(out, Y))
 		fit = 1/error
-
-		
-
-
-		
-
-
 
 		return fit # note we will maximize fitness, hence minimize error
 
@@ -294,9 +285,12 @@ class Evolution(object):
 			swp=self.temp_index[index]
 			self.temp_index[index]=self.temp_index[i]
 			self.temp_index[i]=swp
+	
 
 	def evolve(self ):
 		#np.savetxt(outfile, self.population, fmt = '%1.2f' )
+		print(self.fc1.weight.data)
+		print(self.fc2.weight.data)
 		pop = np.random.rand(self.pop_size,self.dimen)
 		# genIndex = np.loadtxt("out3.txt" )
 		# mom = np.loadtxt("out2.txt" )
@@ -306,6 +300,7 @@ class Evolution(object):
 		self.evaluate()
 		tempfit= self.fitness[self.best_index]
 		while(self.num_evals < self.max_evals):
+			self.set_weights(self.population[self.best_index])
 			tempfit = self.best_fit
 			self.random_parents()
 			for i in range(self.children):
@@ -331,11 +326,18 @@ class Evolution(object):
 					tempfit  =  self.fitness[x]
 			if self.num_evals % 197 == 0:
 				print (self.population[self.best_index])
+				print("--------------------------------")
 				print (self.num_evals, 'num of evals\n\n\n')
-			# np.savetxt(outfile, [ self.num_evals, self.best_index, self.best_fit], fmt='%1.5f', newline="\n")
+				self.errorlist.append(1/self.best_fit)
+			self.set_weights(self.population[self.best_index])
+			np.savetxt(outfile, [ self.num_evals, self.best_index, self.best_fit], fmt='%1.5f', newline="\n")
 		print (self.sub_pop, 'sub_pop')
 		# print (self.population[self.best_index], 'best sol')                                        '
 		print (self.fitness[self.best_index], 'fitness')
+		print("error",self.errorlist)
+		print(self.fc1.weight.data)
+		print(self.fc2.weight.data)
+		print(1/self.fit_func(self.population[self.best_index]))
 
 
 def main():
@@ -352,7 +354,7 @@ def main():
 
 	MinCriteria = 0.005  # stop when RMSE reaches MinCriteria ( problem dependent)
 	random.seed(time.time())
-	max_evals = 1
+	max_evals = 2
 	pop_size =  100
 	# max_limits = np.repeat(5, num_varibles)
 	# min_limits = np.repeat(-5, num_varibles)
