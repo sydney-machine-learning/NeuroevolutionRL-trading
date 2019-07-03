@@ -183,14 +183,17 @@ class Evolution(object):
 		for i in range(self.dimen):
 			for u in range(self.num_parents):
 				centroid[i]  = centroid[i] +  self.population[self.temp_index[u],i]
-		centroid   = centroid / self.num_parents
+		centroid   = centroid / self.num_parents #centroid is basically the avg of the two random weights selected
+		
+		
+		
 		# calculate the distace (d) from centroid to the index parent self.temp_index[0]
 		# also distance (diff) between index and other parents are computed
 		for j in range(1, self.num_parents):
 			for i in range(self.dimen):
 				if j == 1:
-					d[i]= centroid[i]  - self.population[self.temp_index[0],i]
-				diff[j, i] = self.population[self.temp_index[j], i] - self.population[self.temp_index[0],i]
+					d[i]= centroid[i]  - self.population[self.temp_index[0],i]#diff bw the centrid and the parent self.temp_index[0]
+				diff[j, i] = self.population[self.temp_index[j], i] - self.population[self.temp_index[0],i]#diff bw the other parents and self.temp_index[0]
 			if (self.mod(diff[j,:]) < self.EPSILON):
 				print ('Points are very close to each other. Quitting this run')
 				return 0
@@ -259,7 +262,8 @@ class Evolution(object):
 			self.fitness[self.parents[j]]   =  fx
 			self.num_evals += 1
 
-	def family_members(self): #//here a random family (1 or 2) of parents is created who would be replaced by good individuals
+	def family_members(self): #//here a random family (1 or 2) of parents is
+		#  created who would be replaced by good individuals
 		swp = 0
 		for i in range(self.pop_size):
 			self.parents[i] = i
@@ -271,7 +275,10 @@ class Evolution(object):
 			self.parents[randomIndex] = self.parents[i]
 			self.parents[i] = swp
 
-	def find_parents(self): #here the parents to be replaced are added to the temporary subpopulation to assess their goodness against the new solutions formed which will be the basis of whether they should be kept or not
+	def find_parents(self): #here the parents to be replaced are added to the 
+		# temporary subpopulation to assess their goodness against the new 
+		# solutions formed which will be the basis of whether they should be kept
+		# or not
 		self.family_members()
 		for j in range(self.family):
 			self.sub_pop[self.children + j, :] = self.population[self.parents[j],:]
@@ -315,8 +322,14 @@ class Evolution(object):
 					break
 			if tag == 0:
 				break
-			self.find_parents()
-			self.sort_population()
+			self.find_parents()  # add the the first two(self.family=2) randomly chosen parents to the sub_pop and 
+			# store their fx values also in sp_fit
+			#indide the find_parents only we have the func family memebers 
+			# which will create a array parents=[1,2,......pop_size]
+			# this will replace parents[0], parents[1]....parents [self.family]
+			# with random numbers
+			self.sort_population() # first we are creating a list called "list" with 
+			# list=[]
 			self.replace_parents()
 			self.best_index = 0
 			tempfit = self.fitness[0]
