@@ -16,6 +16,48 @@ from torch import optim
 import torch.nn.functional as F
 from sklearn import datasets
 
+
+
+
+
+class TheModelClass(nn.Module):
+	def __init__(self,topology):
+		super(TheModelClass, self).__init__()
+		self.s_size=topology[0]
+		self.h_size=topology[1]
+		self.a_size=topology[2]
+		self.fc1 = nn.Linear(self.s_size, self.h_size)
+		self.fc2 = nn.Linear(self.h_size, self.a_size)
+	def forward(self, x):
+		x = F.sigmoid(self.fc1(x))
+		x = F.sigmoid(self.fc2(x))
+		return x
+
+	def get_weights_dim(self):
+		return (self.s_size+1)*self.h_size + (self.h_size+1)*self.a_size
+
+	def set_weights(self, weights):
+		# print("weights",weights[0:5])
+		s_size = self.s_size
+		h_size = self.h_size
+		a_size = self.a_size
+		#print("11111111111111111111111111111111111111")
+        # separate the weights for each layer
+		fc1_end = (s_size*h_size)+h_size
+		fc1_W = torch.from_numpy(weights[:s_size*h_size].reshape(s_size, h_size))
+		fc1_b = torch.from_numpy(weights[s_size*h_size:fc1_end])
+		fc2_W = torch.from_numpy(weights[fc1_end:fc1_end+(h_size*a_size)].reshape(h_size, a_size))
+		fc2_b = torch.from_numpy(weights[fc1_end+(h_size*a_size):])
+        # set the weights for each layer
+		self.fc1.weight.data.copy_(fc1_W.view_as(self.fc1.weight.data))
+		# print(self.fc1.weight.data)
+		self.fc1.bias.data.copy_(fc1_b.view_as(self.fc1.bias.data))
+		self.fc2.weight.data.copy_(fc2_W.view_as(self.fc2.weight.data))
+		self.fc2.bias.data.copy_(fc2_b.view_as(self.fc2.bias.data))
+
+
+
+
 class Evolution(object):
 	def __init__(self, pop_size,  max_evals,data,output):
 		self.EPSILON = 1e-40  # convergence
@@ -57,41 +99,27 @@ class Evolution(object):
 		self.population =   np.random.randn( pop_size  , self.dimen)  * 5  #[SpeciesPopulation(dimen) for count in xrange(pop_size)]
 		self.sub_pop =  np.random.randn( self.sp_size , self.dimen )  * 5  #[SpeciesPopulation(dimen) for count in xrange(NPSize)]
         # define layers
-		self.fc1 = nn.Linear(self.s_size, self.h_size)
-		self.fc2 = nn.Linear(self.h_size, self.a_size)
+		self.network=TheModelClass([self.s_size,self.h_size,self.a_size])
 		self.errorlist=[]
-	
-	
-	
-	
-	def set_weights(self, weights):
-		# print("weights",weights[0:5])
-		s_size = self.s_size
-		h_size = self.h_size
-		a_size = self.a_size
-		#print("11111111111111111111111111111111111111")
-        # separate the weights for each layer
-		fc1_end = (s_size*h_size)+h_size
-		fc1_W = torch.from_numpy(weights[:s_size*h_size].reshape(s_size, h_size))
-		fc1_b = torch.from_numpy(weights[s_size*h_size:fc1_end])
-		fc2_W = torch.from_numpy(weights[fc1_end:fc1_end+(h_size*a_size)].reshape(h_size, a_size))
-		fc2_b = torch.from_numpy(weights[fc1_end+(h_size*a_size):])
-        # set the weights for each layer
-		self.fc1.weight.data.copy_(fc1_W.view_as(self.fc1.weight.data))
-		# print(self.fc1.weight.data)
-		self.fc1.bias.data.copy_(fc1_b.view_as(self.fc1.bias.data))
-		self.fc2.weight.data.copy_(fc2_W.view_as(self.fc2.weight.data))
-		self.fc2.bias.data.copy_(fc2_b.view_as(self.fc2.bias.data))
+		self.wt1_list=[]
 
-	def forward(self, x):
-		x = F.relu(self.fc1(x))
-		x = F.sigmoid(self.fc2(x))
-		print(x.shape)
-		# print(x.cpu().data)
-		return x.cpu().data
+
+
 	
-	def get_weights_dim(self):
-		return (self.s_size+1)*self.h_size + (self.h_size+1)*self.a_size
+	
+	
+	
+	
+
+	# def forward(self, x):
+	# 	x = F.sigmoid(self.fc1(x))
+	# 	x = F.sigmoid(self.fc2(x))
+	# 	# print(x.shape)
+	# 	# print(x.cpu().data)
+	# 	return x.cpu().data
+	
+	# def get_weights_dim(self):
+	# 	return (self.s_size+1)*self.h_size + (self.h_size+1)*self.a_size
 
 	def fit_func(self, x):    #  function  (can be any other function, model or even a neural network)
 		fit = 0.0
@@ -101,16 +129,12 @@ class Evolution(object):
 		# elif self.problem ==2:  # ellipsoidal - sphere function
 		# 	for j in range(x.size):
 		# 		fit = fit + ((j+1)*(x[j]*x[j]))
-		self.set_weights(x)
-		out=self.forward((self.data).float()).double()
+		self.network.set_weights(x)
+		out=self.network.forward((self.data).float()).double()
 		Y=self.output.double()
-		# # print(out)
-		# error=torch.sqrt(torch.sum((Y-out)**2)/Y.shape[0]).item()
-		# if self.num_evals%200 ==0:
-		# 	(self.errorlist).append(error)
 		criterion = nn.MSELoss()
 		error = torch.sqrt(criterion(out, Y))
-		fit = 1/error
+		fit = error
 
 		return fit # note we will maximize fitness, hence minimize error
 
@@ -289,9 +313,9 @@ class Evolution(object):
 
 	def evolve(self ):
 		#np.savetxt(outfile, self.population, fmt = '%1.2f' )
-		print(self.fc1.weight.data)
-		print(self.fc2.weight.data)
-		pop = np.random.rand(self.pop_size,self.dimen)
+		
+		# pop = np.random.rand(self.pop_size,self.dimen)
+		pop=np.random.uniform(-5,5, size=(self.pop_size, self.dimen)) 
 		# genIndex = np.loadtxt("out3.txt" )
 		# mom = np.loadtxt("out2.txt" )
 		self.population = pop
@@ -300,7 +324,7 @@ class Evolution(object):
 		self.evaluate()
 		tempfit= self.fitness[self.best_index]
 		while(self.num_evals < self.max_evals):
-			self.set_weights(self.population[self.best_index])
+			
 			tempfit = self.best_fit
 			self.random_parents()
 			for i in range(self.children):
@@ -308,7 +332,7 @@ class Evolution(object):
 				if (tag == 0):
 					break
 			if tag == 0:
-				break
+				continue
 			self.find_parents()  # add the the first two(self.family=2) randomly chosen parents to the sub_pop and 
 			# store their fx values also in sp_fit
 			#indide the find_parents only we have the func family memebers 
@@ -328,16 +352,24 @@ class Evolution(object):
 				print (self.population[self.best_index])
 				print("--------------------------------")
 				print (self.num_evals, 'num of evals\n\n\n')
-				self.errorlist.append(1/self.best_fit)
-			self.set_weights(self.population[self.best_index])
-			np.savetxt(outfile, [ self.num_evals, self.best_index, self.best_fit], fmt='%1.5f', newline="\n")
+				self.wt1_list.append(self.network.fc1.weight.data[0:5])
+				
+			self.errorlist.append(self.best_fit)
+			# np.ssavetxt(outfile, [ self.num_evals, self.best_index, self.best_fit], fmt='%1.5f', newline="\n")
 		print (self.sub_pop, 'sub_pop')
 		# print (self.population[self.best_index], 'best sol')                                        '
 		print (self.fitness[self.best_index], 'fitness')
 		print("error",self.errorlist)
-		print(self.fc1.weight.data)
-		print(self.fc2.weight.data)
-		print(1/self.fit_func(self.population[self.best_index]))
+		print("wt",self.wt1_list)
+		# print(self.fc1.weight.data)
+		# print(self.fc2.weight.data)
+		# print(1/self.fit_func(self.population[self.best_index]))
+		x = np.linspace(0, 1, len(self.errorlist))
+		plt.plot(x, self.errorlist, label='rmse')
+		plt.ylabel('RMSE')
+		plt.legend()
+		plt.savefig('rmse_train.png')
+		plt.clf()
 
 
 def main():
@@ -354,7 +386,7 @@ def main():
 
 	MinCriteria = 0.005  # stop when RMSE reaches MinCriteria ( problem dependent)
 	random.seed(time.time())
-	max_evals = 2
+	max_evals = 20000
 	pop_size =  100
 	# max_limits = np.repeat(5, num_varibles)
 	# min_limits = np.repeat(-5, num_varibles)

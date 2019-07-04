@@ -1,0 +1,67 @@
+# DATA CONFIG
+synthetic:
+  num_samples: 40000
+  problem_type: regression
+  topology: "4,25,1"
+  name: synthetic
+  train_data: 'synthetic_data/target_train.csv'
+  test_data: 'synthetic_data/target_test.csv'
+
+iris:
+  num_samples: 10000
+  problem_type: classification
+  topology: "4,10,3"
+  name: iris
+  train_data: 'data_classification/Iris/iris-train.csv'
+  test_data: 'data_classification/Iris/iris-test.csv'
+
+ions:
+  num_samples: 35000
+  problem_type: classification
+  topology: "35,50,2"
+  name: ionosphere
+  train_data: 'data_classification/Ions/ftrain.csv'
+  test_data: 'data_classification/Ions/ftest.csv'
+
+cancer:
+  num_samples: 50000
+  problem_type: classification
+  topology: "8,12,2"
+  name: cancer
+  train_data: 'data_classification/Cancer/ftrain.txt'
+  test_data: 'data_classification/Cancer/ftest.txt'
+
+TicTacToe:
+  num_samples: 50000
+  problem_type: classification
+  topology: "9,15,2"
+  name: TicTacToe
+  train_data: 'data_classification/TicTacToe/ftrain.csv'
+  test_data: 'data_classification/TicTacToe/ftest.csv'
+
+bank:
+  num_samples: 55000
+  problem_type: classification
+  topology: "51,90,2"
+  name: bank
+  train_data: 'data_classification/Bank/train.csv'
+  test_data: 'data_classification/Bank/test.csv'
+
+penDigit:
+  num_samples: 45000
+  problem_type: classification
+  topology: "16,30,10"
+  name: penDigit
+  train_data: 'data_classification/PenDigit/train.csv'
+  test_data: 'data_classification/PenDigit/test.csv'
+
+chess:
+  num_samples: 40000
+  problem_type: classification
+  topology: "6,25,18"
+  name: chess
+  train_data: 'data_classification/Chess/train.csv'
+  test_data: 'data_classification/Chess/test.csv'
+
+
+  
