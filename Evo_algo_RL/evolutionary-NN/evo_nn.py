@@ -10,6 +10,11 @@ import os
 from sklearn.model_selection import train_test_split
 from network_torch import Network
 from g3pcx import G3PCX
+import multiprocessing
+
+
+
+
 
 
 
@@ -56,7 +61,6 @@ class MAIN(G3PCX):
 
     @staticmethod
     def calculate_rmse(actual, targets):
-#        print("11111")
         return np.sqrt((np.square(np.subtract(np.absolute(actual), np.absolute(targets)))).mean())
 
     
