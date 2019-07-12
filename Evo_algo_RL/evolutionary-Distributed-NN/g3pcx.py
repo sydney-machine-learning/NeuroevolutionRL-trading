@@ -1,10 +1,9 @@
 import numpy as np
 import time
 import random
-from network import Network
 
 class G3PCX(object):
-    def __init__(self, population_size, num_variables, max_limits, min_limits,topology, train_data, test_data, max_evals=500000):
+    def __init__(self, population_size, num_variables, max_limits, min_limits, max_evals=500000):
         self.initialize_parameters()
         self.sp_size = self.children + self.family
         self.population = np.random.uniform(min_limits[0], max_limits[0], size=(population_size, num_variables))  #[SpeciesPopulation(num_variables) for count in xrange(population_size)]
@@ -25,24 +24,15 @@ class G3PCX(object):
         self.num_evals = 0
         self.max_evals = max_evals
         self.problem = 1
-        self.topology = topology
-        self.train_data = train_data
-        self.test_data = test_data
-        self.neural_network = Network(topology, train_data, test_data)
 
     def fitness_function(self, x):    #  function  (can be any other function, model or even a neural network)
         fit = 0.0
-        # if self.problem == 1: # rosenbrock
-        #     for j in range(x.size -1):
-        #         fit += (100.0*(x[j]*x[j] - x[j+1])*(x[j]*x[j] - x[j+1]) + (x[j]-1.0)*(x[j]-1.0))
-        # elif self.problem ==2:  # ellipsoidal - sphere function
-        #     for j in range(x.size):
-        #         fit = fit + ((j+1)*(x[j]*x[j]))
-        prediction_train=self.neural_network.generate_output(self.train_data,x)
-        y_train = self.train_data[:, self.topology[0]: self.topology[0] + self.topology[2]]
-        rmse_train = Network.calculate_rmse(prediction_train, y_train)
-        fit=1/rmse_train
-        
+        if self.problem == 1: # rosenbrock
+            for j in range(x.size -1):
+                fit += (100.0*(x[j]*x[j] - x[j+1])*(x[j]*x[j] - x[j+1]) + (x[j]-1.0)*(x[j]-1.0))
+        elif self.problem ==2:  # ellipsoidal - sphere function
+            for j in range(x.size):
+                fit = fit + ((j+1)*(x[j]*x[j]))
         return fit # note we will maximize fitness, hence minimize error
 
     def initialize_parameters(self):

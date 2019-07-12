@@ -1,7 +1,7 @@
 """
 :-------------------------------------------------------------------------------------------------------------------:
-: Title         : Evolutionary Parallel Tempering using Bayesian Neural Networks                                    :
-: Author        : Arpit Kapoor (kapoor.arpit97@gmail.com), Dr Rohitash Chandra (rohitash.chandra@sydney.edu.au)     :
+: Title         : Distributed Neuroevolutionry Reinforcement Learning Algorithms for Automatic Trading                                    :
+: Author        : Rishabh Gupta (rishabhgupta05@gmail.com), Dr Rohitash Chandra (rohitash.chandra@sydney.edu.au)     :
 : Organisation  : Centre for Translational Data Science                                                             :
 :-------------------------------------------------------------------------------------------------------------------:
 """
@@ -30,7 +30,7 @@ class Replica(G3PCX, multiprocessing.Process):
         self.parameter_queue = parameter_queue
         self.signal_main = main_process
         self.event =  event
-        #PARALLEL TEMPERING VARIABLES
+        #PARALLEL COMPUTING VARIABLES
         self.temperature = temperature
         self.swap_interval = swap_interval
         self.burn_in = burn_in
@@ -47,12 +47,10 @@ class Replica(G3PCX, multiprocessing.Process):
         self.max_limits = np.repeat(max_limit, self.w_size)
         self.initialize_sampling_parameters()
         self.create_directory(directory)
-        
-        G3PCX.__init__(self, population_size, self.w_size, self.max_limits, self.min_limits,self.topology,self.train_data,self.test_data)
+        G3PCX.__init__(self, population_size, self.w_size, self.max_limits, self.min_limits)
 
     def fitness_function(self, x):
         fitness = self.neural_network.evaluate_fitness(x)
-        # print("111111111111111111")
         return fitness
 
     def initialize_sampling_parameters(self):
@@ -82,7 +80,7 @@ class Replica(G3PCX, multiprocessing.Process):
             os.mkdir(directory)
 
     @staticmethod
-    def multinomial_likelihood(neural_network, data, weights, temperature):
+    def multinomial_likelihood(neural_network, data, weights):
         y = data[:, neural_network.topology[0]: neural_network.topology[0] + neural_network.topology[2]]
         fx = neural_network.generate_output(data, weights)
         rmse = Network.calculate_rmse(fx, y) # Can be replaced by calculate_nmse function for reporting NMSE
@@ -93,7 +91,7 @@ class Replica(G3PCX, multiprocessing.Process):
                 if y[index_1, index_2] == 1:
                     loss += np.log(probability[index_1, index_2])
         accuracy = Network.calculate_accuracy(fx, y)
-        return [loss/temperature, rmse, accuracy]
+        return [rmse, accuracy]
 
     @staticmethod
     def classification_prior(sigma_squared, weights):
@@ -103,12 +101,12 @@ class Replica(G3PCX, multiprocessing.Process):
         return log_loss
 
     @staticmethod
-    def gaussian_likelihood(neural_network, data, weights, tausq, temperature):
+    def gaussian_likelihood(neural_network, data, weights):
         desired = data[:, neural_network.topology[0]: neural_network.topology[0] + neural_network.topology[2]]
         prediction = neural_network.generate_output(data, weights)
         rmse = Network.calculate_rmse(prediction, desired)
-        loss = -0.5 * np.log(2 * np.pi * tausq) - 0.5 * np.square(desired - prediction) / tausq
-        return [np.sum(loss)/temperature, rmse]
+#        loss = -0.5 * np.log(2 * np.pi * tausq) - 0.5 * np.square(desired - prediction) / tausq
+        return [rmse]
 
     @staticmethod
     def gaussian_prior(sigma_squared, nu_1, nu_2, weights, tausq):
@@ -117,13 +115,13 @@ class Replica(G3PCX, multiprocessing.Process):
         log_loss = part1 - part2 - (1 + nu_1) * np.log(tausq) - (nu_2 / tausq)
         return log_loss
 
-    def likelihood_function(self, neural_network, data, weights, tau, temperature):
+    def likelihood_function(self, neural_network, data, weights):
         if self.problem_type == 'regression':
-            likelihood, rmse = self.gaussian_likelihood(neural_network, data, weights, tau, temperature)
-            return likelihood, rmse, None
+            rmse = self.gaussian_likelihood(neural_network, data, weights)
+            return  rmse, None
         elif self.problem_type == 'classification':
-            likelihood, rmse, accuracy = self.multinomial_likelihood(neural_network, data, weights, temperature)
-            return likelihood, rmse, accuracy
+            rmse, accuracy = self.multinomial_likelihood(neural_network, data, weights)
+            return  rmse, accuracy
 
     def prior_function(self, weights, tau):
         if self.problem_type == 'regression':
@@ -133,23 +131,27 @@ class Replica(G3PCX, multiprocessing.Process):
         # quit()
         return loss
 
-    def evaluate_proposal(self, neural_network, train_data, test_data, weights_proposal, tau_proposal, likelihood_current, prior_current):
-        accept = False
-        likelihood_ignore, rmse_test_proposal, acc_test = self.likelihood_function(neural_network, test_data, weights_proposal, tau_proposal, self.temperature)
-        likelihood_proposal, rmse_train_proposal, acc_train = self.likelihood_function(neural_network, train_data, weights_proposal, tau_proposal, self.temperature)
-        prior_proposal = self.prior_function(weights_proposal, tau_proposal)
-        difference_likelihood = likelihood_proposal - likelihood_current
-        difference_prior = prior_proposal - prior_current
-        mh_ratio = min(1, np.exp(min(709, difference_likelihood)))
-        u = np.random.uniform(0,1)
-        if u < mh_ratio:
-            accept = True
-            likelihood_current = likelihood_proposal
-            prior_proposal = prior_current
+    def evaluate_proposal(self, neural_network, train_data, test_data, weights_proposal):
+        accept = True
+        
+        
+        rmse_test_proposal, acc_test = self.likelihood_function(neural_network, test_data, weights_proposal)
+        rmse_train_proposal, acc_train = self.likelihood_function(neural_network, train_data, weights_proposal)
+# =============================================================================
+#         prior_proposal = self.prior_function(weights_proposal, tau_proposal)
+#         difference_likelihood = likelihood_proposal - likelihood_current
+#         difference_prior = prior_proposal - prior_current
+#         mh_ratio = min(1, np.exp(min(709, difference_likelihood)))
+#         u = np.random.uniform(0,1)
+#         if u < mh_ratio:
+#             accept = True
+#             likelihood_current = likelihood_proposal
+#             prior_proposal = prior_current
+# =============================================================================
         if acc_train == None:
-            return accept, rmse_train_proposal, rmse_test_proposal, likelihood_current, prior_current
+            return accept, rmse_train_proposal, rmse_test_proposal
         else:
-            return accept, rmse_train_proposal, rmse_test_proposal, acc_train, acc_test, likelihood_current, prior_current
+            return accept, rmse_train_proposal, rmse_test_proposal,acc_train,acc_test
 
 
     def run(self):
@@ -172,13 +174,16 @@ class Replica(G3PCX, multiprocessing.Process):
         weights_proposal = weights_initial.copy()
         prediction_train = self.neural_network.generate_output(self.train_data, weights_current)
         prediction_test = self.neural_network.generate_output(self.test_data, weights_current)
-        eta = np.log(np.var(prediction_train - y_train))
-        tau_proposal = np.exp(eta)
-        prior = self.prior_function(weights_current, tau_proposal)
-        [likelihood, rmse_train, acc_train] = self.likelihood_function(self.neural_network, self.train_data, weights_current, tau_proposal, self.temperature)
-
+# =============================================================================
+#         eta = np.log(np.var(prediction_train - y_train))
+#         tau_proposal = np.exp(eta)
+#         prior = self.prior_function(weights_current, tau_proposal)
+#         [likelihood, rmse_train, acc_train] = self.likelihood_function(self.neural_network, self.train_data, weights_current, tau_proposal, self.temperature)
+# 
+# =============================================================================
+        [rmse_train, acc_train] = self.likelihood_function(self.neural_network, self.train_data, weights_current)
+#        print("RMSE Train=",rmse_train)
         rmse_test = Network.calculate_rmse(prediction_test, y_test)
-        rmse_train = Network.calculate_rmse(prediction_train, y_train)
         if self.problem_type == 'classification':
             acc_test = Network.calculate_accuracy(prediction_test, y_test)
 
@@ -192,7 +197,6 @@ class Replica(G3PCX, multiprocessing.Process):
 
         tempfit = 0
         self.evaluate()
-        
         tempfit = self.fitness[self.best_index]
         writ = 0
         if save_knowledge:
@@ -231,23 +235,27 @@ class Replica(G3PCX, multiprocessing.Process):
                     tempfit  =  self.fitness[x]
             # Evaluate population proposal
             # for index in range(self.population_size):
-            #adding random noise for giving probablistic nature
-            weights_proposal = self.population[self.best_index] 
-            eta_proposal = eta + np.random.normal(0, self.eta_stepsize, 1)
-            tau_proposal = np.exp(eta_proposal)
+            weights_proposal = self.population[self.best_index]
+# =============================================================================
+#             eta_proposal = eta + np.random.normal(0, self.eta_stepsize, 1)
+#             tau_proposal = np.exp(eta_proposal)
+# =============================================================================
             if self.problem_type == 'classification':
-                accept, rmse_train, rmse_test, acc_train, acc_test, likelihood, prior = self.evaluate_proposal(self.neural_network, self.train_data, self.test_data, weights_proposal, tau_proposal, likelihood, prior)
+#                accept, rmse_train, rmse_test, acc_train, acc_test, likelihood, prior = self.evaluate_proposal(self.neural_network, self.train_data, self.test_data, weights_proposal, tau_proposal, likelihood, prior)
+                accept, rmse_train, rmse_test, acc_train, acc_test= self.evaluate_proposal(self.neural_network, self.train_data, self.test_data, weights_proposal)
             else:
-                accept, rmse_train, rmse_test, likelihood, prior = self.evaluate_proposal(self.neural_network, self.train_data, self.test_data, weights_proposal, tau_proposal, likelihood, prior)
+                accept, rmse_train, rmse_test = self.evaluate_proposal(self.neural_network, self.train_data, self.test_data, weights_proposal)
 
+#            print(f"Rmse train is {rmse_train}")
             if accept:
                 num_accept += 1
                 weights_current = weights_proposal
-                eta = eta_proposal
+#                eta = eta_proposal
                 # save values into previous variables
                 rmse_train_current = rmse_train
                 rmse_test_current = rmse_test
                 if self.problem_type == 'classification':
+#                    print(f"Acc Train= {acc_train} with chain num= {self.temperature}")
                     acc_train_current = acc_train
                     acc_test_current = acc_test
 
@@ -255,6 +263,7 @@ class Replica(G3PCX, multiprocessing.Process):
                 train_rmse_file.write(str(rmse_train_current)+"\n")
                 test_rmse_file.write(str(rmse_test_current)+"\n")
                 if self.problem_type == 'classification':
+                    print(f"Acc Train= {acc_train} with chain num= {self.temperature}")
                     train_acc_file.write(str(acc_train_current)+"\n")
                     test_acc_file.write(str(acc_test_current)+"\n")
                     writ += 1
@@ -263,7 +272,7 @@ class Replica(G3PCX, multiprocessing.Process):
             if (sample % self.swap_interval == 0 and sample != 0 ):
                 # print('\nTemperature: {} Swapping weights: {}'.format(self.temperature, weights_current[:2]))
 #                param = np.concatenate([weights_current, np.asarray([eta]).reshape(1), np.asarray([likelihood*self.temperature]),np.asarray([self.temperature])])
-                param = weights_current
+                param=weights_current
                 self.parameter_queue.put(param)#parameter queue contains the multiprocessing chains  
                 self.signal_main.set() #it is the main process with the Event "wait chain"
                 #the signal_main basically gives a call to the main process to stop the main chain so that
@@ -271,8 +280,8 @@ class Replica(G3PCX, multiprocessing.Process):
                 
                 self.event.wait()#it is the Event chain which perform the main chain wait
                 # retrieve parameters fom queues if it has been swapped
-                if not self.parameter_queue.empty() :#meaning that the parameter_queue is containing something after the swap is 
-                    #happened
+                # retrieve parameters fom queues if it has been swapped
+                if not self.parameter_queue.empty() :
                     try:
                         result =  self.parameter_queue.get()
                         #print(self.temperature, w, 'param after swap')
@@ -284,36 +293,39 @@ class Replica(G3PCX, multiprocessing.Process):
 #                         likelihood = result[self.w_size+1]/self.temperature
 # =============================================================================
                         # likelihood = self.likelihood_function(self.neural_network, self.train_data, weights_current, np.exp(eta))
-                        print('Swapped weights: {}'.format(weights_current[:2]))
+#                        print('Temperature: {} Swapped weights: {}'.format(self.temperature, weights_current[:2]))
                     except:
                         print ('error')
                 else:
                     print("Khali")
-                self.event.clear() #doubt
+                self.event.clear()
             elapsed_time = ":".join(Replica.convert_time(time.time() - self.start_time))
 
-            print("Temperature: {:.2f} Sample: {:d}, Best Fitness: {:.4f}, Proposal: {:.4f}, Time Elapsed: {:s}".format(self.temperature, sample, rmse_train_current, rmse_train, elapsed_time))
+#            print("Temperature: {:.2f} Sample: {:d}, Best Fitness: {:.4f}, Proposal: {:.4f}, Time Elapsed: {:s}".format(self.temperature, sample, rmse_train_current, rmse_train, elapsed_time))
 
         elapsed_time = time.time() - self.start_time
-#        accept_ratio = num_accept/self.num_samples
+        print(f"Elapsed time is {elapsed_time}")
+# =============================================================================
+#         accept_ratio = num_accept/self.num_samples
+# =============================================================================
         print("Written {} values for Accuracies".format(writ))
         # Close the files
         train_rmse_file.close()
         test_rmse_file.close()
-        print("Temperature: {} done, {} samples sampled out of {}".format(self.temperature, sample, self.num_samples))
+#        print("Temperature: {} done, {} samples sampled out of {}".format(self.temperature, sample, self.num_samples))
 
-class EvoPT(object):
+class EvoPL(object):
 
     def __init__(self, opt, path, geometric=True):
         #FNN Chain variables
-        self.opt = opt  #doubt
+        self.opt = opt
         self.train_data = opt.train_data
         self.test_data = opt.test_data
         self.topology = list(map(int,opt.topology.split(',')))
         self.num_param = (self.topology[0] * self.topology[1]) + (self.topology[1] * self.topology[2]) + self.topology[1] + self.topology[2]
         self.problem_type = opt.problem_type
         #Parallel Tempering variables
-        self.burn_in = opt.burn_in# doubt what is burn_in
+        self.burn_in = opt.burn_in
         self.swap_interval = opt.swap_interval
         self.path = path
         self.max_temp = opt.max_temp
@@ -427,8 +439,10 @@ class EvoPT(object):
     def assign_temperatures(self):
         #Geometric Spacing
         if self.geometric is True:
-            betas = self.default_beta_ladder(2, ntemps=self.num_chains, Tmax=self.max_temp)
-            self.temperatures = [np.inf if beta == 0 else 1.0/beta for beta in betas]
+            for i in range(0,self.num_chains):
+                self.temperatures.append(i)
+#            betas = self.default_beta_ladder(2, ntemps=self.num_chains, Tmax=self.max_temp)
+#            self.temperatures = [np.inf if beta == 0 else 1.0/beta for beta in betas]
         #Linear Spacing
         else:
             temp = 2
@@ -438,8 +452,8 @@ class EvoPT(object):
                 print (self.temperatures[i])
 
     def initialize_chains(self):
-#        self.assign_temperatures() R not needed
-        weights = np.random.randn(self.num_param)
+        self.assign_temperatures()
+#        weights = np.random.randn(self.num_param)
         for chain in range(0, self.num_chains):
             self.chains.append(Replica(self.num_samples, self.burn_in, self.population_size, self.topology, self.train_data, self.test_data, self.path, self.temperatures[chain], self.swap_interval, self.parameter_queue[chain], self.problem_type, main_process=self.wait_chain[chain], event=self.event[chain]))
 
@@ -447,14 +461,18 @@ class EvoPT(object):
         if not parameter_queue_2.empty() and not parameter_queue_1.empty():
             param_1 = parameter_queue_1.get()
             param_2 = parameter_queue_2.get()
-            w_1 = param_1[0:self.num_param]
+            swapped = True
+            param_temp =  param_1
+            param_1 = param_2
+            param_2 = param_temp
+            print("Swapped {}, {}".format(param_1[:2], param_2[:2]))
+            return param_1, param_2, swapped
 # =============================================================================
+#             w_1 = param_1[0:self.num_param]
 #             eta_1 = param_1[self.num_param]
 #             likelihood_1 = param_1[self.num_param+1]
 #             T_1 = param_1[self.num_param+2]
-# =============================================================================
-            w_2 = param_2[0:self.num_param]
-# =============================================================================
+#             w_2 = param_2[0:self.num_param]
 #             eta_2 = param_2[self.num_param]
 #             likelihood_2 = param_2[self.num_param+1]
 #             T_2 = param_2[self.num_param+2]
@@ -465,9 +483,13 @@ class EvoPT(object):
 #                 swap_proposal =  min(1,0.5*np.exp(likelihood_2 - likelihood_1))
 #             except OverflowError:
 #                 swap_proposal = 1
+# =============================================================================
+# =============================================================================
 #             u = np.random.uniform(0,1)
 #             if u < swap_proposal:
-#                 swapped = True
+# =============================================================================
+# =============================================================================
+#             swapped = True
 #                 self.num_swap += 1
 #                 param_temp =  param_1
 #                 param_1 = param_2
@@ -476,15 +498,11 @@ class EvoPT(object):
 #             else:
 #                 print("No swapping!!")
 #                 swapped = False
+#             self.total_swap_proposals += 1
 # =============================================================================
-            swapped = True
-            self.num_swap += 1
-            param_temp =  param_1
-            param_1 = param_2
-            param_2 = param_temp
-            print("Swapped {}, {}".format(param_1[:2], param_2[:2]))
-            self.total_swap_proposals += 1
-            return param_1, param_2, swapped
+# =============================================================================
+#             return param_1, param_2, swapped
+# =============================================================================
         else:
             print("No Swapping occured")
             self.total_swap_proposals += 1
@@ -498,8 +516,10 @@ class EvoPT(object):
         swap_proposal = np.ones(self.num_chains-1)
         # create parameter holders for paramaters that will be swapped
         replica_param = np.zeros((self.num_chains, self.num_param))
-        likelihood = np.zeros(self.num_chains)
-        eta = np.zeros(self.num_chains)
+# =============================================================================
+#         likelihood = np.zeros(self.num_chains)
+#         eta = np.zeros(self.num_chains)
+# =============================================================================
         # Define the starting and ending of MCMC Chains
         start = 0
         end = self.num_samples-1
@@ -517,14 +537,10 @@ class EvoPT(object):
         #SWAP PROCEDURE
         while True:
             count = 0
-            # this loop simply checks whether every chain is alive or not and if all the chains are dead then
-            # kill the process
-            for index in range(self.num_chains): 
+            for index in range(self.num_chains):
                 if not self.chains[index].is_alive():
                     count+=1
-                    print(f"chain number {index+1} is dead")
-                   # print("Temp {} Dead".format(self.chains[index].temperature))
-             #       
+                    print("Temp {} Dead".format(self.chains[index].temperature))
 
             if count == self.num_chains:
                 break
@@ -532,7 +548,7 @@ class EvoPT(object):
             timeout_count = 0
             for index in range(0,self.num_chains):
                 print("Waiting for chain: {}".format(index+1))
-                flag = self.wait_chain[index].wait(timeout=2)#doubt , what is the flag.0000
+                flag = self.wait_chain[index].wait(timeout=2)
                 if flag:
                     print("Signal from chain: {}".format(index+1))
                     timeout_count += 1
@@ -668,7 +684,10 @@ if __name__ == '__main__':
 
     logfile = os.path.join(results_dir, 'log.txt')
     with open(logfile, 'w') as stream:
+        
         stream.write(str(opt))
+        
+    print("opt is",opt)
 
     # READ DATA
     data_path = os.path.join(opt.root, 'Datasets')
@@ -677,7 +696,7 @@ if __name__ == '__main__':
 
 
     # CREATE EVOLUTIONARY PT CLASS
-    evo_pt = EvoPT(opt, results_dir)
+    evo_pt = EvoPL(opt, results_dir)
     
     # INITIALIZE PT CHAINS
     evo_pt.initialize_chains()

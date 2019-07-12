@@ -100,7 +100,7 @@ class Network(object):
         """
         
         rmse = np.sqrt((np.square(np.subtract(observed, targets))).mean())
-        print(rmse)
+#        print(rmse)
         return rmse
 
     # def forward_pass(self, x):
