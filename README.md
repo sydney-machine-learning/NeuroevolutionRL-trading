@@ -17,11 +17,6 @@ pip3 install https://download.pytorch.org/whl/cpu/torchvision-0.3.0-cp36-cp36m-l
 * **Rishabh Gupta** ,*IIT Kharagpur* - [Webpage](https://rishabhguptagithub.github.io/jekyll-theme-prologue/)
 * **Dr. Rohitash Chandra** ,*University Of Sydney* - [Webpage](https://sydney.edu.au/science/people/rohitash.chandra.php)
 
-
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
-
-
-
 ## Acknowledgments
 
 * Dr. Rohitash Chandra
