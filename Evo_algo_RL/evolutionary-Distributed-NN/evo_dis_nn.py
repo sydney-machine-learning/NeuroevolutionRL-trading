@@ -21,9 +21,17 @@ from config import opt
 from network import Network
 from g3pcx import G3PCX
 
+import gym
+env = gym.make('CartPole-v0')
+env.seed(101)
+np.random.seed(101)
+
+
+print('observation space:', env.observation_space)
+print('action space:', env.action_space)
 
 class Replica(G3PCX, multiprocessing.Process):
-    def __init__(self, num_samples, burn_in, population_size, topology, train_data, test_data, directory, temperature, swap_interval, parameter_queue, problem_type,  main_process, event, max_limit=(-5), min_limit=5):
+    def __init__(self, num_samples, burn_in, population_size, topology, directory, temperature, swap_interval, parameter_queue, problem_type,env,main_process, event, max_limit=(-5), min_limit=5):
         # MULTIPROCESSING CLASS CONSTRUCTOR
         multiprocessing.Process.__init__(self)
         self.process_id = temperature
@@ -33,23 +41,24 @@ class Replica(G3PCX, multiprocessing.Process):
         #PARALLEL COMPUTING VARIABLES
         self.temperature = temperature
         self.swap_interval = swap_interval
-        self.burn_in = burn_in
+#      
         # MCMC VARIABLES
         self.num_samples = num_samples
         self.topology = topology
-        self.train_data = train_data
-        self.test_data = test_data
-        self.problem_type = problem_type
+
         self.directory = directory
         self.w_size = (topology[0] * topology[1]) + (topology[1] * topology[2]) + topology[1] + topology[2]
-        self.neural_network = Network(topology, train_data, test_data)
+#        self.neural_network = Network(topology, train_data, test_data,env)
+        self.neural_network = Network(topology,env)
+
         self.min_limits = np.repeat(min_limit, self.w_size)
         self.max_limits = np.repeat(max_limit, self.w_size)
-        self.initialize_sampling_parameters()
+#        self.initialize_sampling_parameters()
         self.create_directory(directory)
         G3PCX.__init__(self, population_size, self.w_size, self.max_limits, self.min_limits)
 
     def fitness_function(self, x):
+#        print("111")
         fitness = self.neural_network.evaluate_fitness(x)
         return fitness
 
@@ -156,24 +165,34 @@ class Replica(G3PCX, multiprocessing.Process):
 
     def run(self):
         save_knowledge = True
-        train_rmse_file = open(os.path.join(self.directory, 'train_rmse_{:.4f}.csv'.format(self.temperature)), 'w')
-        test_rmse_file = open(os.path.join(self.directory, 'test_rmse_{:.4f}.csv'.format(self.temperature)), 'w')
-        if self.problem_type == 'classification':
-            train_acc_file = open(os.path.join(self.directory, 'train_acc_{:.4f}.csv'.format(self.temperature)), 'w')
-            test_acc_file = open(os.path.join(self.directory, 'test_acc_{:.4f}.csv'.format(self.temperature)), 'w')
+# =============================================================================
+#         train_rmse_file = open(os.path.join(self.directory, 'train_rmse_{:.4f}.csv'.format(self.temperature)), 'w')
+#         test_rmse_file = open(os.path.join(self.directory, 'test_rmse_{:.4f}.csv'.format(self.temperature)), 'w')
+#         if self.problem_type == 'classification':
+#             train_acc_file = open(os.path.join(self.directory, 'train_acc_{:.4f}.csv'.format(self.temperature)), 'w')
+#             test_acc_file = open(os.path.join(self.directory, 'test_acc_{:.4f}.csv'.format(self.temperature)), 'w')
+# =============================================================================
+        reward_file = open(os.path.join(self.directory, 'reward_{:.4f}.csv'.format(self.temperature)), 'w')
+
         weights_initial = np.random.uniform(-5, 5, self.w_size)
 
         # ------------------- initialize MCMC
         self.start_time = time.time()
 
-        train_size = self.train_data.shape[0]
-        test_size = self.test_data.shape[0]
-        y_test = self.test_data[:, self.topology[0]: self.topology[0] + self.topology[2]]
-        y_train = self.train_data[:, self.topology[0]: self.topology[0] + self.topology[2]]
+# =============================================================================
+#         train_size = self.train_data.shape[0]
+#         test_size = self.test_data.shape[0]
+# =============================================================================
+# =============================================================================
+#         y_test = self.test_data[:, self.topology[0]: self.topology[0] + self.topology[2]]
+#         y_train = self.train_data[:, self.topology[0]: self.topology[0] + self.topology[2]]
+# =============================================================================
         weights_current = weights_initial.copy()
-        weights_proposal = weights_initial.copy()
-        prediction_train = self.neural_network.generate_output(self.train_data, weights_current)
-        prediction_test = self.neural_network.generate_output(self.test_data, weights_current)
+#        weights_proposal = weights_initial.copy()
+# =============================================================================
+#         prediction_train = self.neural_network.generate_output(self.train_data, weights_current)
+#         prediction_test = self.neural_network.generate_output(self.test_data, weights_current)
+# =============================================================================
 # =============================================================================
 #         eta = np.log(np.var(prediction_train - y_train))
 #         tau_proposal = np.exp(eta)
@@ -181,31 +200,39 @@ class Replica(G3PCX, multiprocessing.Process):
 #         [likelihood, rmse_train, acc_train] = self.likelihood_function(self.neural_network, self.train_data, weights_current, tau_proposal, self.temperature)
 # 
 # =============================================================================
-        [rmse_train, acc_train] = self.likelihood_function(self.neural_network, self.train_data, weights_current)
+#        [rmse_train, acc_train] = self.likelihood_function(self.neural_network, self.train_data, weights_current)
+        
 #        print("RMSE Train=",rmse_train)
-        rmse_test = Network.calculate_rmse(prediction_test, y_test)
-        if self.problem_type == 'classification':
-            acc_test = Network.calculate_accuracy(prediction_test, y_test)
+#        [rmse_train, acc_train] = self.likelihood_function(self.neural_network, self.train_data, weights_current)
+         
+        reward=self.neural_network.evaluate_fitness(weights_current)
+        print(f"THe first reward for chain {self.temperature} is {reward}")
+#        rmse_test = Network.calculate_rmse(prediction_test, y_test)
+#        if self.problem_type == 'classification':
+#            acc_test = Network.calculate_accuracy(prediction_test, y_test)
 
         # save values into previous variables
-        rmse_train_current = rmse_train
-        rmse_test_current = rmse_test
+#        rmse_train_current = reward
+        reward_current=1/reward
+#        rmse_test_current = rmse_test
         num_accept = 0
-        if self.problem_type == 'classification':
-            acc_test_current = acc_test
-            acc_train_current = acc_train
+#        if self.problem_type == 'classification':
+#            acc_test_current = acc_test
+#            acc_train_current = acc_train
 
         tempfit = 0
         self.evaluate()
         tempfit = self.fitness[self.best_index]
         writ = 0
         if save_knowledge:
-            train_rmse_file.write(str(rmse_train_current)+"\n")
-            test_rmse_file.write(str(rmse_test_current)+"\n")
-            if self.problem_type == 'classification':
-                train_acc_file.write(str(acc_train_current)+"\n")
-                test_acc_file.write(str(acc_test_current)+"\n")
-                writ += 1
+            reward_file.write(str(reward_current)+"\n")
+# =============================================================================
+#             test_rmse_file.write(str(rmse_test_current)+"\n")
+#             if self.problem_type == 'classification':
+#                 train_acc_file.write(str(acc_train_current)+"\n")
+#                 test_acc_file.write(str(acc_test_current)+"\n")
+#                 writ += 1
+# =============================================================================
 
         # start sampling
         for sample in range(1, self.num_samples):
@@ -217,12 +244,14 @@ class Replica(G3PCX, multiprocessing.Process):
                     break
             if tag == 0:
                 if save_knowledge:
-                    train_rmse_file.write(str(rmse_train_current)+"\n")
-                    test_rmse_file.write(str(rmse_test_current)+"\n")
-                    if self.problem_type == 'classification':
-                        train_acc_file.write(str(acc_train_current)+"\n")
-                        test_acc_file.write(str(acc_test_current)+"\n")
-                        writ += 1
+                    reward_file.write(str(reward_current)+"\n")
+# =============================================================================
+#                     test_rmse_file.write(str(rmse_test_current)+"\n")
+#                     if self.problem_type == 'classification':
+#                         train_acc_file.write(str(acc_train_current)+"\n")
+#                         test_acc_file.write(str(acc_test_current)+"\n")
+#                         writ += 1
+# =============================================================================
                 continue
             self.find_parents()
             self.sort_population()
@@ -240,33 +269,42 @@ class Replica(G3PCX, multiprocessing.Process):
 #             eta_proposal = eta + np.random.normal(0, self.eta_stepsize, 1)
 #             tau_proposal = np.exp(eta_proposal)
 # =============================================================================
-            if self.problem_type == 'classification':
-#                accept, rmse_train, rmse_test, acc_train, acc_test, likelihood, prior = self.evaluate_proposal(self.neural_network, self.train_data, self.test_data, weights_proposal, tau_proposal, likelihood, prior)
-                accept, rmse_train, rmse_test, acc_train, acc_test= self.evaluate_proposal(self.neural_network, self.train_data, self.test_data, weights_proposal)
-            else:
-                accept, rmse_train, rmse_test = self.evaluate_proposal(self.neural_network, self.train_data, self.test_data, weights_proposal)
-
+# =============================================================================
+#             if self.problem_type == 'classification':
+# #                accept, rmse_train, rmse_test, acc_train, acc_test, likelihood, prior = self.evaluate_proposal(self.neural_network, self.train_data, self.test_data, weights_proposal, tau_proposal, likelihood, prior)
+#                 accept, rmse_train, rmse_test, acc_train, acc_test= self.evaluate_proposal(self.neural_network, self.train_data, self.test_data, weights_proposal)
+#             else:
+#                 accept, rmse_train, rmse_test = self.evaluate_proposal(self.neural_network, self.train_data, self.test_data, weights_proposal)
+# 
+# =============================================================================
 #            print(f"Rmse train is {rmse_train}")
+            reward=self.neural_network.evaluate_fitness(weights_proposal)
+            accept=True
             if accept:
                 num_accept += 1
                 weights_current = weights_proposal
 #                eta = eta_proposal
                 # save values into previous variables
-                rmse_train_current = rmse_train
-                rmse_test_current = rmse_test
-                if self.problem_type == 'classification':
-#                    print(f"Acc Train= {acc_train} with chain num= {self.temperature}")
-                    acc_train_current = acc_train
-                    acc_test_current = acc_test
+                reward_current =1/ reward
+# =============================================================================
+#                 rmse_test_current = rmse_test
+#                 if self.problem_type == 'classification':
+# #                    print(f"Acc Train= {acc_train} with chain num= {self.temperature}")
+#                     acc_train_current = acc_train
+#                     acc_test_current = acc_test
+# =============================================================================
 
             if save_knowledge:
-                train_rmse_file.write(str(rmse_train_current)+"\n")
-                test_rmse_file.write(str(rmse_test_current)+"\n")
-                if self.problem_type == 'classification':
-                    print(f"Acc Train= {acc_train} with chain num= {self.temperature}")
-                    train_acc_file.write(str(acc_train_current)+"\n")
-                    test_acc_file.write(str(acc_test_current)+"\n")
-                    writ += 1
+                print(f"reward is {reward_current} for chain {self.temperature}")
+                reward_file.write(str(reward_current)+"\n")
+# =============================================================================
+#                 test_rmse_file.write(str(rmse_test_current)+"\n")
+#                 if self.problem_type == 'classification':
+#                     print(f"Acc Train= {acc_train} with chain num= {self.temperature}")
+#                     train_acc_file.write(str(acc_train_current)+"\n")
+#                     test_acc_file.write(str(acc_test_current)+"\n")
+#                     writ += 1
+# =============================================================================
 
             #SWAPPING PREP
             if (sample % self.swap_interval == 0 and sample != 0 ):
@@ -301,7 +339,7 @@ class Replica(G3PCX, multiprocessing.Process):
                 self.event.clear()
             elapsed_time = ":".join(Replica.convert_time(time.time() - self.start_time))
 
-#            print("Temperature: {:.2f} Sample: {:d}, Best Fitness: {:.4f}, Proposal: {:.4f}, Time Elapsed: {:s}".format(self.temperature, sample, rmse_train_current, rmse_train, elapsed_time))
+            print(f"Temperature: {self.temperature} Sample:{sample},Best Reaward: {reward_current}, Time Elapsed: {elapsed_time} Chain{self.temperature}")
 
         elapsed_time = time.time() - self.start_time
         print(f"Elapsed time is {elapsed_time}")
@@ -310,18 +348,26 @@ class Replica(G3PCX, multiprocessing.Process):
 # =============================================================================
         print("Written {} values for Accuracies".format(writ))
         # Close the files
-        train_rmse_file.close()
-        test_rmse_file.close()
+        reward_file.close()
+#        test_rmse_file.close()
 #        print("Temperature: {} done, {} samples sampled out of {}".format(self.temperature, sample, self.num_samples))
 
 class EvoPL(object):
 
-    def __init__(self, opt, path, geometric=True):
-        #FNN Chain variables
+    def __init__(self, opt, path,env, geometric=True):
+        #RL variables
+        
         self.opt = opt
-        self.train_data = opt.train_data
-        self.test_data = opt.test_data
-        self.topology = list(map(int,opt.topology.split(',')))
+        self.env=env
+        self.s_size=env.observation_space.shape[0]
+        self.h_size=15
+        self.a_size= env.action_space.n
+        
+# =============================================================================
+#         self.train_data = opt.train_data
+#         self.test_data = opt.test_data
+# =============================================================================
+        self.topology = [self.s_size,self.h_size,self.a_size]
         self.num_param = (self.topology[0] * self.topology[1]) + (self.topology[1] * self.topology[2]) + self.topology[1] + self.topology[2]
         self.problem_type = opt.problem_type
         #Parallel Tempering variables
@@ -331,12 +377,14 @@ class EvoPL(object):
         self.max_temp = opt.max_temp
         self.num_swap = 0
         self.total_swap_proposals = 0
-        self.num_chains = opt.num_chains
+        self.num_chains = 5
         self.chains = []
         self.temperatures = []
-        self.num_samples = int(opt.num_samples/self.num_chains)
+#        self.num_samples = int(opt.num_samples/self.num_chains)
+        self.num_samples= 50000
         self.geometric = geometric
-        self.population_size = opt.population_size
+#        self.population_size = opt.population_size
+        self.population_size= 100
         # create queues for transfer of parameters between process chain
         self.parameter_queue = [multiprocessing.Queue() for i in range(self.num_chains)]
         self.chain_queue = multiprocessing.JoinableQueue()
@@ -440,6 +488,7 @@ class EvoPL(object):
         #Geometric Spacing
         if self.geometric is True:
             for i in range(0,self.num_chains):
+                print(f"temp is{i}")
                 self.temperatures.append(i)
 #            betas = self.default_beta_ladder(2, ntemps=self.num_chains, Tmax=self.max_temp)
 #            self.temperatures = [np.inf if beta == 0 else 1.0/beta for beta in betas]
@@ -453,9 +502,10 @@ class EvoPL(object):
 
     def initialize_chains(self):
         self.assign_temperatures()
+        
 #        weights = np.random.randn(self.num_param)
         for chain in range(0, self.num_chains):
-            self.chains.append(Replica(self.num_samples, self.burn_in, self.population_size, self.topology, self.train_data, self.test_data, self.path, self.temperatures[chain], self.swap_interval, self.parameter_queue[chain], self.problem_type, main_process=self.wait_chain[chain], event=self.event[chain]))
+            self.chains.append(Replica(self.num_samples, self.burn_in, self.population_size, self.topology, self.path, self.temperatures[chain], self.swap_interval, self.parameter_queue[chain], self.problem_type, self.env,main_process=self.wait_chain[chain], event=self.event[chain]))
 
     def swap_procedure(self, parameter_queue_1, parameter_queue_2):
         if not parameter_queue_2.empty() and not parameter_queue_1.empty():
@@ -510,8 +560,10 @@ class EvoPL(object):
             return
 
     def run_chains(self):
-        x_test = np.linspace(0,1,num=self.test_data.shape[0])
-        x_train = np.linspace(0,1,num=self.train_data.shape[0])
+# =============================================================================
+#         x_test = np.linspace(0,1,num=self.test_data.shape[0])
+#         x_train = np.linspace(0,1,num=self.train_data.shape[0])
+# =============================================================================
         # only adjacent chains can be swapped therefore, the number of proposals is ONE less num_chains
         swap_proposal = np.ones(self.num_chains-1)
         # create parameter holders for paramaters that will be swapped
@@ -584,92 +636,109 @@ class EvoPL(object):
 
         #GETTING DATA
         burn_in = int(self.num_samples*self.burn_in)
-        rmse_train = np.zeros((self.num_chains,self.num_samples - burn_in))
-        rmse_test = np.zeros((self.num_chains,self.num_samples - burn_in))
-        if self.problem_type == 'classification':
-            acc_train = np.zeros((self.num_chains,self.num_samples - burn_in))
-            acc_test = np.zeros((self.num_chains,self.num_samples - burn_in))
-        accept_ratio = np.zeros((self.num_chains,1))
+#        rmse_train = np.zeros((self.num_chains,self.num_samples - burn_in))
+#        rmse_test = np.zeros((self.num_chains,self.num_samples - burn_in))
+        reward= np.zeros((self.num_chains,self.num_samples))
+
+# =============================================================================
+#         if self.problem_type == 'classification':
+#             acc_train = np.zeros((self.num_chains,self.num_samples - burn_in))
+#             acc_test = np.zeros((self.num_chains,self.num_samples - burn_in))
+#         accept_ratio = np.zeros((self.num_chains,1))
+# =============================================================================
 
         for i in range(self.num_chains):
 
-            file_name = os.path.join(self.path, 'test_rmse_{:.4f}.csv'.format(self.temperatures[i]))
+# =============================================================================
+#             file_name = os.path.join(self.path, 'test_rmse_{:.4f}.csv'.format(self.temperatures[i]))
+#             dat = np.genfromtxt(file_name, delimiter=',')
+#             rmse_test[i,:] = dat[burn_in:]
+# =============================================================================
+
+            file_name = os.path.join(self.path, 'reward_{:.4f}.csv'.format(self.temperatures[i]))
             dat = np.genfromtxt(file_name, delimiter=',')
-            rmse_test[i,:] = dat[burn_in:]
+            reward[i,:] = dat
+        self.rewards = reward.reshape(self.num_chains*(self.num_samples), 1)   #this was line 684 earlier
 
-            file_name = os.path.join(self.path, 'train_rmse_{:.4f}.csv'.format(self.temperatures[i]))
-            dat = np.genfromtxt(file_name, delimiter=',')
-            rmse_train[i,:] = dat[burn_in:]
 
-            if self.problem_type == 'classification':
-                file_name = os.path.join(self.path, 'test_acc_{:.4f}.csv'.format(self.temperatures[i]))
-                dat = np.genfromtxt(file_name, delimiter=',')
-                acc_test[i,:] = dat[burn_in:]
+# =============================================================================
+#             if self.problem_type == 'classification':
+#                 file_name = os.path.join(self.path, 'test_acc_{:.4f}.csv'.format(self.temperatures[i]))
+#                 dat = np.genfromtxt(file_name, delimiter=',')
+#                 acc_test[i,:] = dat[burn_in:]
+# 
+#                 file_name = os.path.join(self.path, 'train_acc_{:.4f}.csv'.format(self.temperatures[i]))
+#                 dat = np.genfromtxt(file_name, delimiter=',')
+#                 acc_train[i,:] = dat[burn_in:]
+# =============================================================================
 
-                file_name = os.path.join(self.path, 'train_acc_{:.4f}.csv'.format(self.temperatures[i]))
-                dat = np.genfromtxt(file_name, delimiter=',')
-                acc_train[i,:] = dat[burn_in:]
+#        self.rmse_train = rmse_train.reshape(self.num_chains*(self.num_samples - burn_in), 1)
 
-        self.rmse_train = rmse_train.reshape(self.num_chains*(self.num_samples - burn_in), 1)
-        self.rmse_test = rmse_test.reshape(self.num_chains*(self.num_samples - burn_in), 1)
-        if self.problem_type == 'classification':
-            self.acc_train = acc_train.reshape(self.num_chains*(self.num_samples - burn_in), 1)
-            self.acc_test = acc_test.reshape(self.num_chains*(self.num_samples - burn_in), 1)
+# =============================================================================
+#         self.rmse_test = rmse_test.reshape(self.num_chains*(self.num_samples - burn_in), 1)
+#         if self.problem_type == 'classification':
+#             self.acc_train = acc_train.reshape(self.num_chains*(self.num_samples - burn_in), 1)
+#             self.acc_test = acc_test.reshape(self.num_chains*(self.num_samples - burn_in), 1)
+# =============================================================================
 
         # PLOT THE RESULTS
         self.plot_figures()
 
         print("NUMBER OF SWAPS MAIN =", total_swaps_main)
-        print("SWAP ACCEPTANCE = ", self.num_swap*100/self.total_swap_proposals," %")
-        print("SWAP ACCEPTANCE MAIN = ", swaps_appected_main*100/total_swaps_main," %")
+#        print("SWAP ACCEPTANCE = ", self.num_swap*100/self.total_swap_proposals," %")
+#        print("SWAP ACCEPTANCE MAIN = ", swaps_appected_main*100/total_swaps_main," %")
 
-        if self.problem_type == 'classification':
-            return (self.rmse_train, self.rmse_test, self.acc_train, self.acc_test)
-        return (self.rmse_train, self.rmse_test)
+# =============================================================================
+#         if self.problem_type == 'classification':
+#             return (self.rmse_train, self.rmse_test, self.acc_train, self.acc_test)
+# =============================================================================
+        return self.rewards
 
 
 
     def plot_figures(self):
         
         # X-AXIS 
-        x = np.linspace(0, 1, len(self.rmse_train))
+        x = np.linspace(0, 1, len(self.rewards))
 
         # PLOT TRAIN RMSE
-        plt.plot(x, self.rmse_train, label='rmse_train')
+        plt.plot(x, self.rewards, label='rewards')
         plt.xlabel('samples')
-        plt.ylabel('RMSE')
-        plt.title('{} RMSE Train'.format(self.opt.problem.upper()))
+        plt.ylabel('Reward')
+        plt.title('Reward as training')
         plt.legend()
-        plt.savefig(os.path.join(self.path, 'rmse_train.png'))
+        plt.savefig(os.path.join(self.path, 'rewards.png'))
         plt.clf()
 
-        # PLOT TEST RMSE
-        plt.plot(x, self.rmse_test, label='rmse_test')
-        plt.xlabel('samples')
-        plt.ylabel('RMSE')
-        plt.title('{} RMSE Test'.format(self.opt.problem.upper()))
-        plt.legend()
-        plt.savefig(os.path.join(self.path, 'rmse_test.png'))
-        plt.clf()
-
-        if self.problem_type == 'classification':
-            # PLOT TRAIN ACCURACY
-            plt.plot(x, self.acc_train, label='acc_train')
-            plt.xlabel('samples')
-            plt.ylabel('Accuracy %')
-            plt.title('{} Accurace Train'.format(self.opt.problem.upper()))
-            plt.legend()
-            plt.savefig(os.path.join(self.path, 'acc_train.png'))
-            plt.clf()
-
-            # PLOT TEST ACCURACY
-            plt.plot(x, self.acc_test, label='acc_test')
-            plt.xlabel('samples')
-            plt.ylabel('Accuracy %')
-            plt.title('{} Accurace Test'.format(self.opt.problem.upper()))
-            plt.legend()
-            plt.savefig(os.path.join(self.path, 'acc_test.png'))
-            plt.clf()
+# =============================================================================
+#         # PLOT TEST RMSE
+#         plt.plot(x, self.rmse_test, label='rmse_test')
+#         plt.xlabel('samples')
+#         plt.ylabel('RMSE')
+#         plt.title('{} RMSE Test'.format(self.opt.problem.upper()))
+#         plt.legend()
+#         plt.savefig(os.path.join(self.path, 'rmse_test.png'))
+#         plt.clf()
+# 
+#         if self.problem_type == 'classification':
+#             # PLOT TRAIN ACCURACY
+#             plt.plot(x, self.acc_train, label='acc_train')
+#             plt.xlabel('samples')
+#             plt.ylabel('Accuracy %')
+#             plt.title('{} Accurace Train'.format(self.opt.problem.upper()))
+#             plt.legend()
+#             plt.savefig(os.path.join(self.path, 'acc_train.png'))
+#             plt.clf()
+# 
+#             # PLOT TEST ACCURACY
+#             plt.plot(x, self.acc_test, label='acc_test')
+#             plt.xlabel('samples')
+#             plt.ylabel('Accuracy %')
+#             plt.title('{} Accurace Test'.format(self.opt.problem.upper()))
+#             plt.legend()
+#             plt.savefig(os.path.join(self.path, 'acc_test.png'))
+#             plt.clf()
+# =============================================================================
 
 def make_directory(path):
     if not os.path.isdir(path):
@@ -696,13 +765,16 @@ if __name__ == '__main__':
 
 
     # CREATE EVOLUTIONARY PT CLASS
-    evo_pt = EvoPL(opt, results_dir)
+    evo_pt = EvoPL(opt, results_dir,env)
     
     # INITIALIZE PT CHAINS
     evo_pt.initialize_chains()
+    rewards = evo_pt.run_chains()
+
 
     # RUN EVO PT
-    if opt.problem_type == 'classification':
-        rmse_train, rmse_test, acc_train, acc_test = evo_pt.run_chains()
-    elif opt.problem_type == 'regression':
-        rmse_train, rmse_test = evo_pt.run_chains()
+# =============================================================================
+#     if opt.problem_type == 'classification':
+#         rmse_train, rmse_test, acc_train, acc_test = evo_pt.run_chains()
+# =============================================================================
+#    elif opt.problem_type == 'regression':

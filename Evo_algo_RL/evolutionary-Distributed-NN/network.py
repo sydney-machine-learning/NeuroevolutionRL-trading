@@ -5,6 +5,9 @@ from torch import nn
 from torch import optim
 import torch.nn.functional as F
 from torch.autograd import Variable
+import gym
+import math
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class Network(object):
     """
@@ -29,12 +32,16 @@ class Network(object):
     B2: ndarray
         Biases for input-hidden layers
     """
-    def __init__(self, topology, train_data, test_data, learn_rate = 0.5):
-        
+    def __init__(self, topology,env, learn_rate = 0.5):
+        #RL env variables
+        super(Network, self).__init__()
+        self.env = env
         # INITIALIZE NETWORK ATTRIBUTES
         self.topology = topology
-        self.train_data = train_data
-        self.test_data = test_data
+# =============================================================================
+#         self.train_data = train_data
+#         self.test_data = test_data
+# =============================================================================
         self.lrate = learn_rate
         self.s_size=topology[0]
         self.h_size=topology[1]
@@ -215,15 +222,18 @@ class Network(object):
         #     Input = data[i, 0:self.topology[0]]
         #     self.forward_pass(Input)
         #     fx[i] = self.out
-        train=data[:,0:self.topology[0]]
-        train=Variable(torch.from_numpy(train)).float()
+# =============================================================================
+#         train=data[:,0:self.topology[0]]
+#         train=Variable(torch.from_numpy(train)).float()
+# =============================================================================
         # print(train.shape)
 
-        x = F.sigmoid(self.fc1(train))
-        x = F.sigmoid(self.fc2(x))
-        return x.detach().numpy()
+        x = F.relu(self.fc1(data))
+        x = F.relu(self.fc2(x))
+        return x.cpu().data
+#        return x.detach().numpy()
 
-    def evaluate_fitness(self, w):
+    def evaluate_fitness(self, w,gamma=1.0,max_t=500):
         """
         Fitness Function
 
@@ -237,7 +247,23 @@ class Network(object):
         rmse: float
             Root Mean Squared Error on training data
         """
-        data = self.train_data
-        y = data[:, self.topology[0]: self.topology[0] + self.topology[2]]
-        fx = self.generate_output(data, w)
-        return self.calculate_rmse(fx, y)
+#        data = self.train_data
+        episode_return = 0.0
+        state = self.env.reset()
+        for t in range(max_t):
+            state = torch.from_numpy(state).float().to(device)
+            action=self.generate_output(state,w)
+            values,indices=torch.max(action,0)
+            action=indices.item()
+            
+            state, reward, done, _ = self.env.step(action)
+            episode_return += reward * math.pow(gamma, t)
+            if done:
+                break
+        return 1/episode_return
+        
+# =============================================================================
+#         y = data[:, self.topology[0]: self.topology[0] + self.topology[2]]
+#         fx = self.generate_output(data, w)
+#         return self.calculate_rmse(fx, y)
+# =============================================================================
