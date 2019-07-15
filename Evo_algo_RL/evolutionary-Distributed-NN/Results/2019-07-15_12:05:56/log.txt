@@ -1,0 +1,1 @@
+Namespace(num_chains=6, num_samples=None, population_size=200, root='/home/rishotics/sydney/NeuroevolutionRL-trading/Evo_algo_RL', run_id='2019-07-15_12:05:56', swap_interval=10)
