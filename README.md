@@ -19,6 +19,5 @@ pip3 install https://download.pytorch.org/whl/cpu/torchvision-0.3.0-cp36-cp36m-l
 
 ## Acknowledgments
 
-* Dr. Rohitash Chandra
 * Mr. Arpit Kapoor
 * Mr. Aman Ashray
